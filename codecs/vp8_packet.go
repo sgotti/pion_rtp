@@ -78,6 +78,8 @@ type VP8Packet struct {
 	K         uint8  /* 1 if KEYIDX is present */
 	PictureID uint16 /* 8 or 16 bits, picture ID */
 	TL0PICIDX uint8  /* 8 bits temporal level zero index */
+	Tid       uint8
+	KeyIDX    uint8
 
 	Payload []byte
 }
@@ -111,19 +113,30 @@ func (p *VP8Packet) Unmarshal(payload []byte) ([]byte, error) {
 		payloadIndex++
 	}
 
-	if p.I == 1 { // PID present?
-		if payload[payloadIndex]&0x80 > 0 { // M == 1, PID is 16bit
+	if p.I == 1 { // PictureID present?
+		d := payload[payloadIndex]
+		if d&0x80 > 0 { // M == 1, PID is 16bit
+			d2 := payload[payloadIndex+1]
+			p.PictureID = (uint16(d)<<8 | uint16(d2)) & 0x7FFF
 			payloadIndex += 2
 		} else {
+			p.PictureID = uint16(d) & 0x007F
 			payloadIndex++
 		}
 	}
 
 	if p.L == 1 {
+		p.TL0PICIDX = payload[payloadIndex]
 		payloadIndex++
 	}
 
 	if p.T == 1 || p.K == 1 {
+		if p.T == 1 {
+			p.Tid = payload[payloadIndex] & 0xC0 >> 6
+		}
+		if p.K == 1 {
+			p.KeyIDX = payload[payloadIndex] & 0x1F
+		}
 		payloadIndex++
 	}
 
